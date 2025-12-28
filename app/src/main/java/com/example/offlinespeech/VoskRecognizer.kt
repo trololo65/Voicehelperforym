@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
@@ -67,7 +68,16 @@ class VoskRecognizer(
         try {
             recognizer = Recognizer(model, 16000.0f)
             val bufferSize = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-            audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, 16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+            
+            // Используем VOICE_RECOGNITION вместо MIC для лучшей фильтрации фонового звука
+            // VOICE_RECOGNITION специально оптимизирован для распознавания речи
+            val audioSource = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                MediaRecorder.AudioSource.VOICE_RECOGNITION
+            } else {
+                MediaRecorder.AudioSource.MIC
+            }
+            
+            audioRecord = AudioRecord(audioSource, 16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
             audioRecord?.startRecording()
 
             recognitionThread = Thread {

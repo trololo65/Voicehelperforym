@@ -14,6 +14,10 @@ class MediaController(private val context: Context) {
     private val audioManager: AudioManager by lazy {
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
+    
+    // Сохраненная громкость для временного уменьшения
+    private var savedVolume: Int? = null
+    private var isVolumeTemporarilyLowered = false
 
     /**
      * Воспроизвести/пауза музыки (эмуляция нажатия кнопки play/pause на наушниках)
@@ -171,6 +175,72 @@ class MediaController(private val context: Context) {
             )
         } catch (e: Exception) {
             Log.e("MediaController", "Ошибка при установке минимальной громкости", e)
+        }
+    }
+
+    /**
+     * Временно уменьшить громкость для улучшения распознавания речи
+     * Сохраняет текущую громкость и уменьшает до 20% от максимума
+     */
+    fun temporarilyLowerVolume() {
+        try {
+            if (isVolumeTemporarilyLowered) {
+                return // Уже уменьшена
+            }
+            
+            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val targetVolume = (maxVolume * 0.2).toInt().coerceAtLeast(1)
+            
+            // Сохраняем текущую громкость только если она выше целевой
+            if (currentVolume > targetVolume) {
+                savedVolume = currentVolume
+                Log.d("MediaController", "Временное уменьшение громкости с $currentVolume до $targetVolume")
+                audioManager.setStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    targetVolume,
+                    0 // Не показываем UI при временном уменьшении
+                )
+                isVolumeTemporarilyLowered = true
+            }
+        } catch (e: Exception) {
+            Log.e("MediaController", "Ошибка при временном уменьшении громкости", e)
+        }
+    }
+
+    /**
+     * Восстановить сохраненную громкость после временного уменьшения
+     */
+    fun restoreVolume() {
+        try {
+            if (!isVolumeTemporarilyLowered || savedVolume == null) {
+                return
+            }
+            
+            val targetVolume = savedVolume!!
+            Log.d("MediaController", "Восстановление громкости до $targetVolume")
+            audioManager.setStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                targetVolume,
+                0 // Не показываем UI при восстановлении
+            )
+            
+            savedVolume = null
+            isVolumeTemporarilyLowered = false
+        } catch (e: Exception) {
+            Log.e("MediaController", "Ошибка при восстановлении громкости", e)
+        }
+    }
+
+    /**
+     * Получить текущую громкость
+     */
+    fun getCurrentVolume(): Int {
+        return try {
+            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        } catch (e: Exception) {
+            Log.e("MediaController", "Ошибка при получении текущей громкости", e)
+            0
         }
     }
 

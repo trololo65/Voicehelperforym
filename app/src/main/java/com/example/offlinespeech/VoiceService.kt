@@ -14,11 +14,17 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.voicehelperforym.MainActivity
+import com.example.offlinespeech.VoiceSettings
 
 class VoiceService : Service(), VoskRecognizer.RecognitionListener {
 
     private lateinit var voskRecognizer: VoskRecognizer
     private lateinit var mediaController: MediaController
+    
+    // Для отслеживания речи и временного уменьшения громкости
+    private var speechDetected = false
+    private val restoreVolumeHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var restoreVolumeRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -57,6 +63,10 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
 
     override fun onResult(result: String) {
         Log.d("VOICE_SERVICE", "Распознано: $result")
+        
+        // Восстанавливаем громкость после завершения распознавания
+        restoreVolumeAfterSpeech()
+        
         if (result.isNotEmpty()) {
             handleRecognizedText(result)
         }
@@ -64,8 +74,49 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
     }
 
     override fun onPartialResult(partialResult: String) {
-        // В фоновом режиме частичные результаты обычно не важны, но можем логировать
+        val lowerPartial = partialResult.lowercase().trim()
+        
+        // Уменьшаем громкость только если обнаружено триггерное слово
+        // и настройка требует триггерное слово
+        if (VoiceSettings.isTriggerWordRequired(this)) {
+            val triggerWords = listOf("помощник", "ассистент", "ассист", "хелпер", "вокс", "бокс", "help", "алиса")
+            val containsTrigger = triggerWords.any { trigger ->
+                lowerPartial.contains(trigger, ignoreCase = true)
+            }
+            
+            // Уменьшаем громкость только если обнаружено триггерное слово и достаточно длинный текст
+            if (containsTrigger && lowerPartial.length >= 8 && !speechDetected) {
+                speechDetected = true
+                Log.d("VOICE_SERVICE", "Обнаружено триггерное слово, временно уменьшаем громкость")
+                mediaController.temporarilyLowerVolume()
+                
+                // Отменяем предыдущее восстановление громкости, если оно было запланировано
+                restoreVolumeRunnable?.let { restoreVolumeHandler.removeCallbacks(it) }
+            }
+        }
+        
         Log.d("VOICE_SERVICE", "Частичный результат: $partialResult")
+    }
+    
+    /**
+     * Восстановить громкость после завершения речи
+     * Используем небольшую задержку, чтобы не восстанавливать слишком быстро
+     */
+    private fun restoreVolumeAfterSpeech() {
+        if (!speechDetected) {
+            return
+        }
+        
+        // Отменяем предыдущее восстановление, если оно было запланировано
+        restoreVolumeRunnable?.let { restoreVolumeHandler.removeCallbacks(it) }
+        
+        // Планируем восстановление громкости через 1 секунду
+        restoreVolumeRunnable = Runnable {
+            mediaController.restoreVolume()
+            speechDetected = false
+            Log.d("VOICE_SERVICE", "Громкость восстановлена после распознавания")
+        }
+        restoreVolumeHandler.postDelayed(restoreVolumeRunnable!!, 1000)
     }
 
     override fun onError(error: String) {
@@ -121,9 +172,10 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         
         // Синонимы триггерного слова (распределены так, чтобы не пересекаться)
         val triggerWords = listOf("помощник", "ассистент", "ассист", "хелпер", "вокс", "бокс", "help", "алиса")
+        val requireTrigger = VoiceSettings.isTriggerWordRequired(this)
         
         // Команда для остановки сервиса (проверяем первым)
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("останови", "выключи", "стоп", "заверши работу"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("останови", "выключи", "стоп", "заверши работу"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда ОСТАНОВИТЬ СЕРВИС распознана!")
             updateNotification("Остановка сервиса...")
             stopSelf()
@@ -133,7 +185,7 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         // Команды управления громкостью
         
         // Увеличить громкость
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("громче", "увеличь громкость", "прибавь громкость", "louder", "volume up"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("громче", "увеличь громкость", "прибавь громкость", "louder", "volume up"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда УВЕЛИЧИТЬ ГРОМКОСТЬ распознана!")
             mediaController.increaseVolume()
             updateNotification("Громкость увеличена")
@@ -141,7 +193,7 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         }
         
         // Уменьшить громкость
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("тише", "уменьши громкость", "убавь громкость", "quieter", "volume down"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("тише", "уменьши громкость", "убавь громкость", "quieter", "volume down"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда УМЕНЬШИТЬ ГРОМКОСТЬ распознана!")
             mediaController.decreaseVolume()
             updateNotification("Громкость уменьшена")
@@ -149,7 +201,7 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         }
         
         // Громкость максимум
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("максимум", "максимальная громкость", "максимум громкость", "громкость максимум", "maximum volume", "max volume"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("максимум", "максимальная громкость", "максимум громкость", "громкость максимум", "maximum volume", "max volume"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда ГРОМКОСТЬ МАКСИМУМ распознана!")
             mediaController.setMaxVolume()
             updateNotification("Громкость максимум")
@@ -157,7 +209,7 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         }
         
         // Громкость минимум (10%)
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("минимум", "минимальная громкость", "минимум громкость", "громкость минимум", "minimum volume", "min volume"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("минимум", "минимальная громкость", "минимум громкость", "громкость минимум", "minimum volume", "min volume"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда ГРОМКОСТЬ МИНИМУМ распознана!")
             mediaController.setMinVolume()
             updateNotification("Громкость минимум (10%)")
@@ -167,7 +219,7 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         // Команды управления музыкой
         
         // Включить/переключить музыку (проверяем более длинные фразы первыми)
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("включи музыку", "запусти музыку", "включи песню", "запусти песню", "play music"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("включи музыку", "запусти музыку", "включи песню", "запусти песню", "play music"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда PLAY (длинная) распознана!")
             mediaController.togglePlayPause()
             updateNotification("Воспроизведение переключено")
@@ -175,7 +227,7 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         }
         
         // Короткие команды play
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("играй", "плей", "play", "начать", "продолжи", "старт"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("играй", "плей", "play", "начать", "продолжи", "старт"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда PLAY распознана!")
             mediaController.togglePlayPause()
             updateNotification("Воспроизведение переключено")
@@ -183,7 +235,7 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         }
         
         // Остановить/пауза музыки
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("пауза", "стоп", "stop", "pause", "останови музыку", "останови"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("пауза", "стоп", "stop", "pause", "останови музыку", "останови"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда PAUSE/STOP распознана!")
             mediaController.togglePlayPause()
             updateNotification("Воспроизведение остановлено")
@@ -191,14 +243,14 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         }
         
         // Следующий трек (проверяем более длинные фразы первыми)
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("следующий трек", "дальше трек", "next track"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("следующий трек", "дальше трек", "next track"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда NEXT (длинная) распознана!")
             mediaController.nextTrack()
             updateNotification("Следующий трек")
             return
         }
         
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("следующий", "дальше", "next", "далее", "некст"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("следующий", "дальше", "next", "далее", "некст"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда NEXT распознана!")
             mediaController.nextTrack()
             updateNotification("Следующий трек")
@@ -206,14 +258,14 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         }
         
         // Предыдущий трек (проверяем более длинные фразы первыми)
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("предыдущий трек", "назад трек", "previous track"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("предыдущий трек", "назад трек", "previous track"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда PREVIOUS (длинная) распознана!")
             mediaController.previousTrack()
             updateNotification("Предыдущий трек")
             return
         }
         
-        if (matchesCommandWithTrigger(lowerText, triggerWords, listOf("предыдущий", "назад", "previous", "вернись"))) {
+        if (matchesCommand(lowerText, triggerWords, listOf("предыдущий", "назад", "previous", "вернись"), requireTrigger)) {
             Log.d("VOICE", "✓ Команда PREVIOUS распознана!")
             mediaController.previousTrack()
             updateNotification("Предыдущий трек")
@@ -222,6 +274,24 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
         
         // Если ни одна команда не найдена, логируем для отладки
         Log.d("VOICE_SERVICE", "Текст не распознан как команда: '$lowerText'")
+    }
+    
+    /**
+     * Проверка команды с учетом настройки триггерного слова
+     * @param text распознанный текст
+     * @param triggerWords список триггерных слов
+     * @param commands список команд
+     * @param requireTrigger требуется ли триггерное слово (из настроек)
+     * @return true если команда найдена
+     */
+    private fun matchesCommand(text: String, triggerWords: List<String>, commands: List<String>, requireTrigger: Boolean): Boolean {
+        if (requireTrigger) {
+            // Проверяем команды с триггерным словом
+            return matchesCommandWithTrigger(text, triggerWords, commands)
+        } else {
+            // Проверяем команды без триггерного слова (простое совпадение)
+            return matchesCommandWithoutTrigger(text, commands)
+        }
     }
     
     /**
@@ -253,24 +323,28 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
     }
     
     /**
-     * Проверка наличия триггерного слова в тексте (устаревший метод)
-     * Для коротких команд (<= 6 символов) используем точное совпадение слов
+     * Проверка команды без триггерного слова
+     * Для коротких команд (<= 6 символов) используем точное совпадение слова
      * Для длинных команд используем поиск подстроки
      */
-    private fun matchesTrigger(text: String, triggers: List<String>): Boolean {
-        return triggers.any { trigger ->
-            val lowerTrigger = trigger.lowercase().trim()
-            if (lowerTrigger.length <= 6) {
+    private fun matchesCommandWithoutTrigger(text: String, commands: List<String>): Boolean {
+        for (command in commands) {
+            val lowerCommand = command.lowercase().trim()
+            if (lowerCommand.length <= 6) {
                 // Для коротких команд проверяем точное совпадение слова
-                // Это предотвращает ложные срабатывания
                 val words = text.split(Regex("\\s+")).map { it.trim() }
-                words.any { word -> word.equals(lowerTrigger, ignoreCase = true) } ||
-                text.equals(lowerTrigger, ignoreCase = true)
+                if (words.any { it.equals(lowerCommand, ignoreCase = true) } ||
+                    text.equals(lowerCommand, ignoreCase = true)) {
+                    return true
+                }
             } else {
                 // Для длинных команд используем поиск подстроки
-                text.contains(lowerTrigger, ignoreCase = true)
+                if (text.contains(lowerCommand, ignoreCase = true)) {
+                    return true
+                }
             }
         }
+        return false
     }
 
     private fun updateNotification(contentText: String) {
@@ -318,6 +392,11 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        
+        // Восстанавливаем громкость перед остановкой сервиса
+        restoreVolumeRunnable?.let { restoreVolumeHandler.removeCallbacks(it) }
+        mediaController.restoreVolume()
+        
         voskRecognizer.destroy()
         Log.d("VOICE", "VoiceService onDestroy()")
     }

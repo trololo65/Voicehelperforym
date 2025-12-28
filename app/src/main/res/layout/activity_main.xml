@@ -38,6 +38,14 @@
         android:layout_marginTop="32dp"
         android:layout_marginBottom="32dp" />
 
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switchRequireTrigger"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Требовать триггерное слово (например, 'помощник')"
+        android:checked="true"
+        android:layout_marginBottom="24dp"/>
+
     <Button
         android:id="@+id/btnStartService"
         android:layout_width="wrap_content"

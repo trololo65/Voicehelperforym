@@ -8,10 +8,12 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.widget.SwitchCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.offlinespeech.VoiceService
+import com.example.offlinespeech.VoiceSettings
 import com.example.offlinespeech.VoskRecognizer
 
 class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
@@ -24,6 +26,7 @@ class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
     private lateinit var btnToggleRecognition: Button
     private lateinit var btnStartService: Button
     private lateinit var btnStopService: Button
+    private lateinit var switchRequireTrigger: SwitchCompat
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -45,6 +48,15 @@ class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
         btnToggleRecognition = findViewById(R.id.btnToggleRecognition)
         btnStartService = findViewById(R.id.btnStartService)
         btnStopService = findViewById(R.id.btnStopService)
+        switchRequireTrigger = findViewById(R.id.switchRequireTrigger)
+
+        // Загружаем текущее значение настройки
+        switchRequireTrigger.isChecked = VoiceSettings.isTriggerWordRequired(this)
+
+        // Сохраняем настройку при изменении
+        switchRequireTrigger.setOnCheckedChangeListener { _, isChecked ->
+            VoiceSettings.setTriggerWordRequired(this, isChecked)
+        }
 
         btnToggleRecognition.isEnabled = false // Disable until recognizer is ready
 
