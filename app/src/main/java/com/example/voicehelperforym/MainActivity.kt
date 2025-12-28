@@ -5,118 +5,159 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.offlinespeech.VoiceService
+import com.example.offlinespeech.VoskRecognizer
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
 
-    private lateinit var btnStart: Button
-    private lateinit var btnStop: Button
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                Log.d("MainActivity", "Разрешение на аудио получено")
-                startVoiceService()
-            } else {
-                Log.e("MainActivity", "Разрешение на аудио не предоставлено")
-                Toast.makeText(this, "Нужно разрешение на запись аудио", Toast.LENGTH_LONG).show()
-                finish()
-            }
+    private lateinit var voskRecognizer: VoskRecognizer
+    private var isRecognizing = false
+
+    private lateinit var tvStatus: TextView
+    private lateinit var tvResult: TextView
+    private lateinit var btnToggleRecognition: Button
+    private lateinit var btnStartService: Button
+    private lateinit var btnStopService: Button
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            voskRecognizer.initialize()
+        } else {
+            Toast.makeText(this, "Разрешение на запись аудио не предоставлено", Toast.LENGTH_LONG).show()
+            finish()
         }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        Log.d("MainActivity", "Приложение запущено")
+        tvStatus = findViewById(R.id.tvStatus)
+        tvResult = findViewById(R.id.tvResult)
+        btnToggleRecognition = findViewById(R.id.btnToggleRecognition)
+        btnStartService = findViewById(R.id.btnStartService)
+        btnStopService = findViewById(R.id.btnStopService)
 
-        btnStart = findViewById(R.id.btnStartService)
-        btnStop = findViewById(R.id.btnStopService)
+        btnToggleRecognition.isEnabled = false // Disable until recognizer is ready
 
-        btnStart.setOnClickListener {
-            Log.d("MainActivity", "Кнопка запуска нажата")
-            checkAudioPermissionAndStart()
+        voskRecognizer = VoskRecognizer(this, this)
+
+        btnToggleRecognition.setOnClickListener {
+            toggleRecognition()
         }
 
-        btnStop.setOnClickListener {
-            Log.d("MainActivity", "Кнопка остановки нажата")
+        btnStartService.setOnClickListener {
+            startVoiceService()
+        }
+
+        btnStopService.setOnClickListener {
             stopVoiceService()
         }
 
-        // Для Android 12+ запускаем при открытии приложения
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            checkAudioPermissionAndStart()
+        checkAudioPermission()
+    }
+
+    private fun checkAudioPermission() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                voskRecognizer.initialize()
+            }
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
         }
+    }
+
+    private fun toggleRecognition() {
+        if (isRecognizing) {
+            voskRecognizer.stopListening()
+        } else {
+            voskRecognizer.startListening()
+        }
+    }
+
+    private fun startVoiceService() {
+        val intent = Intent(this, VoiceService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        Toast.makeText(this, "Фоновый сервис запущен", Toast.LENGTH_SHORT).show()
     }
 
     private fun stopVoiceService() {
         val intent = Intent(this, VoiceService::class.java)
         stopService(intent)
-        Toast.makeText(this, "Сервис остановлен", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Фоновый сервис остановлен", Toast.LENGTH_SHORT).show()
     }
 
-    private fun checkAudioPermissionAndStart() {
-        Log.d("MainActivity", "Проверка разрешений...")
+    private fun updateButtonState() {
+        runOnUiThread {
+            btnToggleRecognition.text = if (isRecognizing) "Остановить" else "Начать распознавание"
+        }
+    }
 
-        when {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED -> {
-                Log.d("MainActivity", "Разрешение уже есть")
-                startVoiceService()
-            }
-
-            shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> {
-                Toast.makeText(this, "Для распознавания голоса нужно разрешение на запись аудио", Toast.LENGTH_LONG).show()
-                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
-
-            else -> {
-                Log.d("MainActivity", "Запрашиваем разрешение")
-                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    override fun onStatusChange(status: String) {
+        runOnUiThread {
+            tvStatus.text = status
+            when (status) {
+                "Готов к работе" -> {
+                    btnToggleRecognition.isEnabled = true
+                    btnStartService.isEnabled = true
+                }
+                "Слушаю..." -> {
+                    isRecognizing = true
+                    updateButtonState()
+                    btnStartService.isEnabled = false // Disable service btn while interactive mode is on
+                }
+                "Остановлено" -> {
+                    isRecognizing = false
+                    updateButtonState()
+                    btnStartService.isEnabled = true
+                }
             }
         }
     }
 
-    private fun startVoiceService() {
-        Log.d("MainActivity", "Запуск VoiceService...")
-
-        try {
-            val intent = Intent(this, VoiceService::class.java)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Для Android 8.0+ используем startForegroundService
-                Log.d("MainActivity", "Запуск через startForegroundService")
-                startForegroundService(intent)
+    override fun onResult(result: String) {
+        runOnUiThread {
+            if (result.isEmpty()) {
+                tvResult.text = "Скажите что-нибудь..."
             } else {
-                Log.d("MainActivity", "Запуск через startService")
-                startService(intent)
-            }
-
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Ошибка при запуске сервиса", e)
-
-            // Если ошибка связана с ограничениями Android 12+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                e is IllegalStateException) {
-                Toast.makeText(this,
-                    "Для Android 12+ нужна кнопка для запуска. Нажмите 'Запустить'",
-                    Toast.LENGTH_LONG).show()
+                tvResult.text = result
             }
         }
     }
 
-    // Можно добавить кнопку в layout для явного запуска
-    // или использовать метод onResume
-    override fun onResume() {
-        super.onResume()
-        // Для Android 12+ можно попробовать запустить здесь
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            checkAudioPermissionAndStart()
+    override fun onPartialResult(partialResult: String) {
+        runOnUiThread {
+            tvResult.text = partialResult
         }
+    }
+
+    override fun onError(error: String) {
+        runOnUiThread {
+            tvStatus.text = "Ошибка: $error"
+            isRecognizing = false
+            updateButtonState()
+            btnStartService.isEnabled = true
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        voskRecognizer.destroy()
     }
 }

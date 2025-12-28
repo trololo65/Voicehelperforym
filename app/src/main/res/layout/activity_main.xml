@@ -10,33 +10,45 @@
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Статус: Не запущено"
+        android:text="Статус"
         android:textSize="18sp"
         android:layout_marginBottom="24dp"/>
 
     <Button
-        android:id="@+id/btnStartService"
+        android:id="@+id/btnToggleRecognition"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Запустить сервис"
+        android:text="Начать распознавание"
         android:layout_marginBottom="16dp"
-        android:padding="16dp"/>
-
-    <Button
-        android:id="@+id/btnStopService"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Остановить сервис"
-        android:layout_marginBottom="32dp"
         android:padding="16dp"/>
 
     <TextView
         android:id="@+id/tvResult"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Ожидание команд..."
         android:textSize="16sp"
         android:gravity="center"
         android:layout_marginTop="24dp"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/listDivider"
+        android:layout_marginTop="32dp"
+        android:layout_marginBottom="32dp" />
+
+    <Button
+        android:id="@+id/btnStartService"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Запустить сервис в фоне"
+        android:layout_marginBottom="16dp"/>
+
+    <Button
+        android:id="@+id/btnStopService"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Остановить сервис в фоне"/>
 
 </LinearLayout>
