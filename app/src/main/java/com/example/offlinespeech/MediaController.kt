@@ -98,20 +98,36 @@ class MediaController(private val context: Context) {
      */
     fun increaseVolume() {
         try {
-            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val step = (maxVolume * 0.2).toInt().coerceAtLeast(1) // Увеличиваем на 20%
-            val targetVolume = (currentVolume + step).coerceAtMost(maxVolume)
             
-            if (currentVolume < maxVolume) {
-                Log.d("MediaController", "Увеличение громкости с $currentVolume до $targetVolume")
+            // Базовый уровень для команды:
+            // - если громкость временно занижена, берём сохранённую (исходную) громкость
+            // - иначе работаем от текущей системной громкости
+            val baseVolume = if (isVolumeTemporarilyLowered && savedVolume != null) {
+                savedVolume!!
+            } else {
+                audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            }
+
+            val targetVolume = (baseVolume + step).coerceAtMost(maxVolume)
+            
+            if (baseVolume < maxVolume) {
+                Log.d("MediaController", "Увеличение громкости (база $baseVolume) до $targetVolume")
+
+                // Обновляем сохранённую громкость, чтобы при восстановлении учесть изменение
+                if (isVolumeTemporarilyLowered) {
+                    savedVolume = targetVolume
+                }
+
+                // Мгновенно применяем новый уровень к системе
                 audioManager.setStreamVolume(
                     AudioManager.STREAM_MUSIC,
                     targetVolume,
                     AudioManager.FLAG_SHOW_UI
                 )
             } else {
-                Log.d("MediaController", "Громкость уже максимальная ($currentVolume)")
+                Log.d("MediaController", "Громкость уже максимальная ($baseVolume)")
             }
         } catch (e: Exception) {
             Log.e("MediaController", "Ошибка при увеличении громкости", e)
@@ -123,20 +139,35 @@ class MediaController(private val context: Context) {
      */
     fun decreaseVolume() {
         try {
-            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val step = (maxVolume * 0.2).toInt().coerceAtLeast(1) // Уменьшаем на 20%
-            val targetVolume = (currentVolume - step).coerceAtLeast(1)
             
-            if (currentVolume > 1) {
-                Log.d("MediaController", "Уменьшение громкости с $currentVolume до $targetVolume")
+            // Базовый уровень для команды:
+            // - если громкость временно занижена, берём сохранённую (исходную) громкость
+            // - иначе работаем от текущей системной громкости
+            val baseVolume = if (isVolumeTemporarilyLowered && savedVolume != null) {
+                savedVolume!!
+            } else {
+                audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            }
+
+            val targetVolume = (baseVolume - step).coerceAtLeast(1)
+            
+            if (baseVolume > 1) {
+                Log.d("MediaController", "Уменьшение громкости (база $baseVolume) до $targetVolume")
+
+                // Обновляем сохранённую громкость, чтобы при восстановлении учесть изменение
+                if (isVolumeTemporarilyLowered) {
+                    savedVolume = targetVolume
+                }
+
                 audioManager.setStreamVolume(
                     AudioManager.STREAM_MUSIC,
                     targetVolume,
                     AudioManager.FLAG_SHOW_UI
                 )
             } else {
-                Log.d("MediaController", "Громкость уже минимальная ($currentVolume)")
+                Log.d("MediaController", "Громкость уже минимальная ($baseVolume)")
             }
         } catch (e: Exception) {
             Log.e("MediaController", "Ошибка при уменьшении громкости", e)
@@ -209,22 +240,45 @@ class MediaController(private val context: Context) {
     }
 
     /**
-     * Восстановить сохраненную громкость после временного уменьшения
+     * Восстановить сохраненную громкость после временного уменьшения.
+     *
+     * ВАЖНО:
+     * - Если за время временного уменьшения громкость была изменена (например, командой
+     *   "помощник, громче"), мы НЕ трогаем текущую громкость и не откатываем её.
+     * - В этом случае просто сбрасываем флаги и считаем новую громкость актуальной.
      */
     fun restoreVolume() {
         try {
             if (!isVolumeTemporarilyLowered || savedVolume == null) {
                 return
             }
-            
-            val targetVolume = savedVolume!!
-            Log.d("MediaController", "Восстановление громкости до $targetVolume")
-            audioManager.setStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                targetVolume,
-                0 // Не показываем UI при восстановлении
-            )
-            
+
+            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val loweredVolume = (maxVolume * 0.2).toInt().coerceAtLeast(1)
+
+            val originalSaved = savedVolume!!
+
+            if (currentVolume == loweredVolume) {
+                // Громкость все еще на временно заниженном уровне — восстанавливаем исходную
+                Log.d(
+                    "MediaController",
+                    "Восстановление громкости с $currentVolume до сохраненной $originalSaved"
+                )
+                audioManager.setStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    originalSaved,
+                    0 // Не показываем UI при восстановлении
+                )
+            } else {
+                // Громкость уже была изменена (например, командами громче/тише) —
+                // не вмешиваемся и считаем текущий уровень новым базовым.
+                Log.d(
+                    "MediaController",
+                    "Громкость изменилась с временного уровня ($loweredVolume) до $currentVolume, не восстанавливаем сохраненное $originalSaved"
+                )
+            }
+
             savedVolume = null
             isVolumeTemporarilyLowered = false
         } catch (e: Exception) {
