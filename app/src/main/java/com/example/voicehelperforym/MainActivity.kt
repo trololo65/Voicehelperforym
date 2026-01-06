@@ -27,6 +27,7 @@ class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
     private lateinit var btnStartService: Button
     private lateinit var btnStopService: Button
     private lateinit var switchRequireTrigger: SwitchCompat
+    private lateinit var btnOpenMicSettings: Button
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -49,6 +50,7 @@ class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
         btnStartService = findViewById(R.id.btnStartService)
         btnStopService = findViewById(R.id.btnStopService)
         switchRequireTrigger = findViewById(R.id.switchRequireTrigger)
+        btnOpenMicSettings = findViewById(R.id.btnOpenMicSettings)
 
         // Загружаем текущее значение настройки
         switchRequireTrigger.isChecked = VoiceSettings.isTriggerWordRequired(this)
@@ -74,6 +76,10 @@ class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
             stopVoiceService()
         }
 
+        btnOpenMicSettings.setOnClickListener {
+            openMicSettings()
+        }
+
         checkAudioPermission()
     }
 
@@ -95,8 +101,27 @@ class MainActivity : AppCompatActivity(), VoskRecognizer.RecognitionListener {
         if (isRecognizing) {
             voskRecognizer.stopListening()
         } else {
+            // Перед запуском распознавания применяем актуальные настройки микрофона
+            applyMicSettingsToRecognizer()
             voskRecognizer.startListening()
         }
+    }
+
+    private fun applyMicSettingsToRecognizer() {
+        val micRange = VoiceSettings.getMicRangeLevel(this)
+        val nsEnabled = VoiceSettings.isNoiseSuppressionEnabled(this)
+        val audioSourceMode = VoiceSettings.getAudioSourceMode(this)
+        val minPartialLength = VoiceSettings.getMinPartialLength(this)
+
+        voskRecognizer.setMicRange(micRange)
+        voskRecognizer.setNoiseSuppressionEnabled(nsEnabled)
+        voskRecognizer.setAudioSourceMode(audioSourceMode)
+        voskRecognizer.setMinPartialLength(minPartialLength)
+    }
+
+    private fun openMicSettings() {
+        val intent = Intent(this, MicSettingsActivity::class.java)
+        startActivity(intent)
     }
 
     private fun startVoiceService() {

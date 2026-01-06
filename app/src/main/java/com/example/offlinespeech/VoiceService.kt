@@ -40,6 +40,10 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
 
         mediaController = MediaController(this)
         voskRecognizer = VoskRecognizer(this, this)
+
+        // Применяем текущие настройки микрофона к распознавателю
+        applyMicSettingsToRecognizer()
+
         voskRecognizer.initialize()
     }
 
@@ -388,6 +392,27 @@ class VoiceService : Service(), VoskRecognizer.RecognitionListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return START_STICKY
+    }
+
+    /**
+     * Применяет текущие настройки микрофона (дальность, шумоподавление, источник, порог partial)
+     * к экземпляру VoskRecognizer.
+     */
+    private fun applyMicSettingsToRecognizer() {
+        val micRange = VoiceSettings.getMicRangeLevel(this)
+        val nsEnabled = VoiceSettings.isNoiseSuppressionEnabled(this)
+        val audioSourceMode = VoiceSettings.getAudioSourceMode(this)
+        val minPartialLength = VoiceSettings.getMinPartialLength(this)
+
+        Log.d(
+            "VOICE_SERVICE",
+            "Применяем настройки к VoskRecognizer: micRange=$micRange, nsEnabled=$nsEnabled, audioSourceMode=$audioSourceMode, minPartialLength=$minPartialLength"
+        )
+
+        voskRecognizer.setMicRange(micRange)
+        voskRecognizer.setNoiseSuppressionEnabled(nsEnabled)
+        voskRecognizer.setAudioSourceMode(audioSourceMode)
+        voskRecognizer.setMinPartialLength(minPartialLength)
     }
 
     override fun onDestroy() {

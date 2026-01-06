@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tvMicSettingsTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Настройки микрофона"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Дальность микрофона -->
+        <TextView
+            android:id="@+id/tvMicRangeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Дальность микрофона"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvMicRangeValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Дальность: 5/10 (средне)"
+            android:layout_marginBottom="4dp" />
+
+        <SeekBar
+            android:id="@+id/seekMicRange"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="10"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Меньшее значение — для ближней речи, большее — для дальней (тихой) речи."
+            android:textSize="12sp"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Шумоподавление -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Шумоподавление"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <Switch
+            android:id="@+id/switchNoiseSuppression"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Включить системное шумоподавление (NS, AEC, AGC)"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Источник микрофона -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Источник микрофона"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/radioGroupAudioSource"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/radioVoiceRecognition"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Режим распознавания речи (VOICE_RECOGNITION)" />
+
+            <RadioButton
+                android:id="@+id/radioVoiceCommunication"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Режим связи (VOICE_COMMUNICATION)" />
+
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="На разных устройствах эти режимы могут звучать по-разному. Попробуйте оба и выберите лучший."
+            android:textSize="12sp"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Минимальная длина partial-результата -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Минимальная длина partial-результата"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvMinPartialValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Минимальная длина partial: 3 символов"
+            android:layout_marginBottom="4dp" />
+
+        <SeekBar
+            android:id="@+id/seekMinPartial"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="5"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Меньшее значение — больше чувствительность (но больше шума). Большее значение — строже фильтрация."
+            android:textSize="12sp"
+            android:layout_marginBottom="24dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Эти настройки влияют как на интерактивный режим, так и на фоновый сервис."
+            android:textSize="12sp"
+            android:layout_marginBottom="24dp" />
+
+        <Button
+            android:id="@+id/btnBackToMain"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Назад к главному экрану" />
+
+    </LinearLayout>
+
+</ScrollView>
+
+
