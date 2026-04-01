@@ -1,15 +1,61 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Gradle
+.gradle/
+**/build/
+
+# Локальные настройки (путь к SDK и т.д.)
 local.properties
+
+# Подпись и секреты
+*.jks
+*.keystore
+*.p12
+*.pfx
+key.properties
+keystore.properties
+# Раскомментируйте при необходимости:
+# google-services.json
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+
+# Сборки и артефакты
+*.apk
+*.aab
+*.aar
+*.ap_
+
+# Классы и DEX
+*.class
+*.dex
+
+# Логи и дампы
+*.log
+*.hprof
+
+# NDK / CMake
+.externalNativeBuild/
+.cxx/
+obj/
+
+# Захваты экрана / профилирование
+captures/
+
+# Kotlin
+.kotlin/
+
+# Lint
+lint/intermediates/
+lint/generated/
+lint/tmp/
+lint-results*.xml
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+*~
+
+# Опционально: не коммитить крупные бинарники модели Vosk (раскомментируйте при хранении модели вне репозитория)
+# app/src/main/assets/model/am/
+# app/src/main/assets/model/graph/*.fst
+# app/src/main/assets/model/ivector/final.*
